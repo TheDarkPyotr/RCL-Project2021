@@ -1,9 +1,6 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.lang.reflect.Array;
-import java.net.Socket;
+import java.net.*;
 import java.rmi.RemoteException;
 import java.util.*;
 
@@ -18,6 +15,7 @@ class ServerThread extends Thread{
     String[] tokens = null;
     String authenticatedUsername;
     private DataManager data = null;
+    private Integer status = 1;
 
 
     ArrayList<Project> projectList;
@@ -45,6 +43,7 @@ class ServerThread extends Thread{
             try {
 
                     request = is.readLine();
+
                     String delims = "[#]+";
                     tokens = request.split(delims);
 
@@ -59,12 +58,13 @@ class ServerThread extends Thread{
                 case "LOGIN-REQUEST":
 
                     list = this.data.getUserList();
-                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + list.toString());
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
                     response =  "";
 
 
                     if (!list.containsKey(tokens[1])) response = "USERNAME-ERROR";
                     else if (list.get(tokens[1]).compareTo(tokens[2]) != 0) response = "PASSWORD-ERROR";
+                    else if(this.data.getUserOnlineList().containsKey(tokens[1]) && this.data.getUserOnlineList().get(tokens[1]).compareTo("online") == 0) response = "ONLINE-ERROR";
                     else {
 
                         Iterator it = this.data.getUserOnlineList().entrySet().iterator();
@@ -77,9 +77,11 @@ class ServerThread extends Thread{
                         authenticatedUsername = tokens[1];
                         try {
                             this.data.setUserStatus(authenticatedUsername, "online");
-                        } catch (RemoteException e) {
+
+                        } catch (IOException e) {
                             e.printStackTrace();
                         }
+
 
                     }
 
@@ -115,13 +117,25 @@ class ServerThread extends Thread{
 
                     System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: ");
 
-                    if (data.getUserOnlineList().get(tokens[1]).compareTo("offline") == 0) response = "ERROR";
-                    else {
-                        response = "OK";
-                        try {
-                            data.setUserStatus(tokens[1],"offline");
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
+                    //Close only TCP Connection, for non-authenticated user
+                    if(tokens.length == 1) response = "OK";
+                     else{
+                         // Close TCP connection and change user status, for authenticated user
+                        if (data.getUserOnlineList().get(tokens[1]).compareTo("offline") == 0) response = "ERROR";
+                        else {
+                            response = "OK";
+                            try {
+                                data.setUserStatus(tokens[1], "offline");
+
+                                try {
+                                    data.dataWriter(new File("./storage"));
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                }
+
+                            } catch (RemoteException e) {
+                                e.printStackTrace();
+                            }
                         }
                     }
 
@@ -149,6 +163,122 @@ class ServerThread extends Thread{
 
                     break;
 
+                case  "CANCEL-PROJECT-REQUEST":
+
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
+                    response = "";
+
+                    if(data.cancelProject(tokens[1])) response =  "OK";
+                    else response = "CARD-STATUS-ERROR";
+                    os.println(response);
+                    os.flush();
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+
+
+                    break;
+
+                case  "ADD-CARD-REQUEST":
+
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
+                    response = "";
+                    status = data.addCard(tokens[1], tokens[2], tokens[3]);
+                    if(status == 0) response =  "OK";
+                    else if(status == 2) response = "PROJECT-ELIMINATED";
+                    else response =  "ERROR";
+                    os.println(response);
+                    os.flush();
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+
+
+                    break;
+
+                case  "ADD-MEMBER-REQUEST":
+
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1] +  " " + tokens[2]);
+                    response = "";
+
+                    if(data.addMember(tokens[1],tokens[2]) == 0) response =  "OK";
+                    else response = "ALREADY-MEMBER";
+                    os.println(response);
+                    os.flush();
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+
+
+                    break;
+
+                case  "SHOW-CARDS-REQUEST":
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
+                    response = "";
+
+                    String[] cardList = data.showCards(tokens[1]);
+                    if(cardList == null) response = "NO-CARDS-ERROR";
+                    else{
+                        for (int i = 0; i < cardList.length; i++)
+                        response = response.concat(cardList[i]).concat("#");
+                    }
+                    os.println(response);
+                    os.flush();
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+
+                    break;
+
+                case  "SHOW-CARD-REQUEST":
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
+                    response = "";
+
+                    String[] cardInfo = data.showCard(tokens[1],tokens[2]);
+                    if(cardInfo == null) response = "CARD-ERROR";
+                    else{
+
+                            response = response.concat(cardInfo[0]).concat("#").concat(cardInfo[1]);
+                    }
+                    os.println(response);
+                    os.flush();
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+
+                    break;
+
+                case  "MOVE-CARD-REQUEST":
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1] + tokens[2] + tokens[3]);
+                    response = "";
+
+                        /* STATUS CODEX
+            return 0 --> ok
+            return 1 --> initial and destination list equals
+            return 2 --> error
+            return 3 --> internal error
+
+         */
+
+                    Integer status = data.moveCard(tokens[1],tokens[2],tokens[3]);
+                    switch(status){
+                        case 0:
+                            response = "OK";
+                            try {
+                                chatStateUpdater(tokens[1],tokens[2],tokens[3]);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                            break;
+                        case 1:
+                            response = "COINCIDENT-LISTS";
+                            break;
+                        case 2:
+                            response = "STATE-VIOLATION";
+                            break;
+                        case 3:
+                            response =  "INTERNAL-ERROR";
+                            break;
+                        case 4:
+                            response =  "PROJECT-ELIMINATED";
+                            break;
+                    }
+                    os.println(response);
+                    os.flush();
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+
+                    break;
+
 
                 case "LIST-PROJECT-REQUEST":
 
@@ -157,7 +287,7 @@ class ServerThread extends Thread{
                     projectList = data.getProjectList(authenticatedUsername);
                     if(projectList != null){
                         for (Project pr : projectList)
-                           response = response.concat(pr.getProjectName()).concat("#");
+                           response = response.concat(pr.getProjectName()).concat("#").concat(pr.getMulticastIP()).concat("#");
                     }
 
                     os.println(response);
@@ -166,6 +296,22 @@ class ServerThread extends Thread{
 
                     break;
 
+
+                case "CARD-HISTORY-REQUEST":
+
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
+                    response = "";
+                    String[] history = data.getCardHistory(tokens[1],tokens[2]);
+                    if(history != null){
+                        for (String s : history)
+                            response = response.concat(s).concat("#");
+                    } else response =  "PROJECT-ELIMINATED";
+
+                    os.println(response);
+                    os.flush();
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+
+                    break;
 
                 default:
                   System.out.println("SERVER SIDE ERROR - QUIT ALL! ");
@@ -181,6 +327,59 @@ class ServerThread extends Thread{
         } catch (IOException e) {
             System.out.println("[SERVER] Error during shutdown connection with " + s.getInetAddress());
             e.printStackTrace();
+        }
+    }
+
+    public void chatStateUpdater(String projectName, String cardName, String destinationList) throws IOException {
+
+        String projectIP = data.getProjectMulticastIP(projectName);
+
+
+        InetAddress group = null;
+        int port = 6789;
+        try{
+
+            group = InetAddress.getByName(projectIP);
+
+
+        } catch(Exception e){
+
+            System.out.println("[SERVER] Error: impossible update project " + projectName +  " multicast chat!\n");
+
+        }
+
+
+        MulticastSocket ms=null;
+
+        try{
+            ms = new MulticastSocket(port);
+            //ms.setTimeToLive(1);
+            ms.joinGroup(group);
+
+            byte[] data;
+            data = ("[SYSTEM] " + authenticatedUsername + " ha spostato la card " + cardName + " nella lista " + destinationList +  "").getBytes();
+            DatagramPacket dpsend = new DatagramPacket(data, data.length, group, port);
+
+
+            try{
+                    int ttl = ms.getTimeToLive();
+                    ms.setTimeToLive(10);
+                    ms.send(dpsend);
+                    ms.setTimeToLive(ttl);
+
+                }catch(SocketException es){es.printStackTrace();}
+                catch (IOException ex){
+                    System.out.println (ex);
+                }
+
+
+        }finally{
+            if (ms!= null) {
+                try {
+                    ms.leaveGroup(group);
+                    ms.close();
+            } catch (IOException ex){}
+            }
         }
     }
 }

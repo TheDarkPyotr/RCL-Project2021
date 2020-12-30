@@ -1,6 +1,7 @@
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
 import javax.swing.*;
 import javax.swing.event.*;
 
@@ -46,7 +47,7 @@ public class ClientMenuGUI extends JPanel {
         this.project = project;
 
     }
-    public ClientMenuGUI ClientRemoveCardGUI() {
+    public ClientMenuGUI ClientRemoveCardGUI(final JDialog dashWindow) {
 
         removeCardComponent = new JPanel();
         //construct components
@@ -69,6 +70,18 @@ public class ClientMenuGUI extends JPanel {
         add (jcomp4);
         add (jcomp5);
 
+        jcomp2.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent actionEvent) {
+
+                if(client.cancelProject(project) == 1) JOptionPane.showMessageDialog(null, "Errore: Cards non ancora ultimate", "Errore: impossibile eliminare " + project, JOptionPane.ERROR_MESSAGE);
+                else {
+                    JOptionPane.showMessageDialog(null, "Progetto eliminato", "Progetto eliminato con successo" + project, JOptionPane.ERROR_MESSAGE);
+                dashWindow.setVisible(false);
+                }
+            }
+        });
+
         //set component bounds (only needed by Absolute Positioning)
         jcomp1.setBounds (15, 15, 800, 25);
         jcomp2.setBounds (15, 160, 165, 40);
@@ -82,7 +95,7 @@ public class ClientMenuGUI extends JPanel {
     }
 
 
-    public ClientMenuGUI ClientAddCardGUI(){
+    public ClientMenuGUI ClientAddCardGUI(JPanel cardListPanel, JPanel moveCardPanel, JPanel historyPanel, JFrame mainWindow, JDialog dashWindow, JDialog projectWindow){
 
 
         jcomp11 = new JLabel ("Titolo card");
@@ -104,6 +117,44 @@ public class ClientMenuGUI extends JPanel {
         add (jcomp51);
         add(scrollBar);
 
+        jcomp51.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent actionEvent) {
+
+                String cardName = jcomp21.getText();
+                String cardDesc = jcomp41.getText();
+
+                if(cardName.isEmpty())   JOptionPane.showMessageDialog(null, "Titolo card vuoto!", "Errore", JOptionPane.ERROR_MESSAGE);
+                    else if(cardDesc.isEmpty())   JOptionPane.showMessageDialog(null, "Descrizione card assente!", "Errore", JOptionPane.ERROR_MESSAGE);
+                    else {
+                        int response = client.addCard(project, cardName, cardDesc);
+                        if(response == 0){
+                            JOptionPane.showMessageDialog(null, "Card inserita con successo", "OK", JOptionPane.ERROR_MESSAGE);
+
+                            //Update show cards
+                            cardListPanel.removeAll();
+                            cardListPanel.add (new ClientMenuGUI(client, project).ClientShowCardsGUI(mainWindow));
+
+                            //Update move cards
+                            moveCardPanel.removeAll();
+                            moveCardPanel.add (new ClientMenuGUI(client, project).ClientMoveCardGUI(projectWindow));
+
+                            //Update card history
+                            historyPanel.removeAll();
+                            historyPanel.add (new ClientMenuGUI(client, project).ClientShowCardHistoryGUI(dashWindow,projectWindow));
+
+
+
+                        } else if(response == 2) {
+                            JOptionPane.showMessageDialog(null, "Progetto eliminato!", "ERRORE", JOptionPane.ERROR_MESSAGE);
+                            projectWindow.setVisible(false);
+                        }
+                            else JOptionPane.showMessageDialog(null, "Card giá esistente!", "ERRORE", JOptionPane.ERROR_MESSAGE);
+
+                        }
+                }
+        });
+
         //set component bounds (only needed by Absolute Positioning)
         jcomp11.setBounds (50, 20, 100, 25);
         jcomp21.setBounds (50, 45, 275, 25);
@@ -115,14 +166,19 @@ public class ClientMenuGUI extends JPanel {
 
     }
 
+
+
     public ClientMenuGUI ClientShowCardsGUI(final JFrame mainWindow){
 
 
             //construct preComponents
-            String[] cardListComponent = {"ToDoMEME - Todo", "Progetto RCL - Done", "Lol - Done"};
+            String[] cardListComponent = client.showCards(project);
+
+            //String[] cardListComponent = {"ToDoMEME - Todo", "Progetto RCL - Done", "Lol - Done"};
 
             //construct components
             cardListLabel = new JLabel ("Lista cards");
+            if(cardListComponent[0].compareTo("NO-CARDS-ERROR") == 0) cardListComponent[0] = "";
             cardList = new JList (cardListComponent );
 
             //adjust size and set layout
@@ -137,38 +193,39 @@ public class ClientMenuGUI extends JPanel {
                     int index = theList.locationToIndex(mouseEvent.getPoint());
                     if (index >= 0) {
                         Object o = theList.getModel().getElementAt(index);
+                        if (o.toString().compareTo("") != 0) {
+                            String[] cardInfo = client.showCard(project, o.toString());
 
 
-
-                        final JDialog showCardDesc = new JDialog(mainWindow, "Descrizione card" + o.toString(), true);
+                            final JDialog showCardDesc = new JDialog(mainWindow, "Descrizione card " + o.toString(), true);
 
 
                             //construct components
-                        showCardDescLabel = new JLabel ("Descrizione card " + o.toString());
-                        showCardDescArea = new JTextArea (5, 5);
+                            showCardDescLabel = new JLabel("Stato card: " + cardInfo[0]);
+                            showCardDescArea = new JTextArea(5, 5);
 
-                        //adjust size and set layout
-                        showCardDesc.setPreferredSize (new Dimension (347, 236));
-                        showCardDesc.setLayout (null);
+                            //adjust size and set layout
+                            showCardDesc.getContentPane().setPreferredSize(new Dimension(347, 236));
+                            showCardDesc.getContentPane().setLayout(null);
 
                             //add components
-                        showCardDesc.getContentPane().add (showCardDescLabel);
-                        showCardDesc.getContentPane().add (showCardDescArea);
+                            showCardDesc.getContentPane().add(showCardDescLabel);
+                            showCardDesc.getContentPane().add(showCardDescArea);
 
                             //set component bounds (only needed by Absolute Positioning)
-                        showCardDescLabel.setBounds (15, 10, 300, 25);
-                        showCardDescArea.setBounds (15, 40, 315, 175);
-                        showCardDescArea.setEnabled(false);
-                        showCardDescArea.setText("qui va la descrizione della card");
+                            showCardDescLabel.setBounds(15, 10, 300, 25);
+                            showCardDescArea.setBounds(15, 40, 315, 175);
+                            showCardDescArea.setEnabled(false);
+                            showCardDescArea.setText(cardInfo[1]);
 
-                        showCardDesc.setLocationRelativeTo(null);
+                            showCardDesc.setLocationRelativeTo(null);
 
-                        showCardDesc.setDefaultCloseOperation (JFrame.HIDE_ON_CLOSE);
-                        showCardDesc.pack();
-                        showCardDesc.setVisible (true);
+                            showCardDesc.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+                            showCardDesc.pack();
+                            showCardDesc.setVisible(true);
 
 
-
+                        }
                     }
                 }
             }
@@ -188,14 +245,15 @@ public class ClientMenuGUI extends JPanel {
         return this;
     }
 
-    public ClientMenuGUI ClientMoveCardGUI(){
+    public ClientMenuGUI ClientMoveCardGUI(JDialog projectWindow){
 
 
             //construct preComponents
-            String[] jcomp1Items = {"Meme - Todo", "RCL - Done", "SERVER - Todo"};
+            String[] jcomp1Items = client.showCards(project);
             String[] jcomp2Items = {"Todo", "In progress", "To be revised", "Done"};
 
             //construct components
+            if(jcomp1Items[0].compareTo("NO-CARDS-ERROR") == 0) jcomp1Items[0] = "";
             cardBox = new JComboBox (jcomp1Items);
             stateBox = new JComboBox (jcomp2Items);
             selectCardLabel = new JLabel ("Seleziona card");
@@ -213,6 +271,34 @@ public class ClientMenuGUI extends JPanel {
             add (changeCardStateLabel);
             add(saveCardStateButton);
 
+            saveCardStateButton.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent actionEvent) {
+
+                    if (cardBox.getSelectedItem().toString().compareTo("") != 0) {
+                        Integer response = client.moveCard(project, cardBox.getSelectedItem().toString(), stateBox.getSelectedItem().toString());
+                        switch (response) {
+                            case 0:
+                                JOptionPane.showMessageDialog(null, "Modifica salvata con successo", "OK", JOptionPane.ERROR_MESSAGE);
+                                break;
+                            case 1:
+                                JOptionPane.showMessageDialog(null, "Card giá in stato " + stateBox.getSelectedItem().toString(), "ERRORE", JOptionPane.ERROR_MESSAGE);
+                                break;
+                            case 2:
+                                JOptionPane.showMessageDialog(null, "Stato non congruo", "ERRORE", JOptionPane.ERROR_MESSAGE);
+                                break;
+                            case 3:
+                                JOptionPane.showMessageDialog(null, "Errore interno, riprova piú tardi", "INTERNAL SERVER ERROR", JOptionPane.ERROR_MESSAGE);
+                                break;
+                            case 4:
+                                JOptionPane.showMessageDialog(null, "Progetto eliminato da un altro utente!", "Impossibile completare l´operazione", JOptionPane.ERROR_MESSAGE);
+                                projectWindow.setVisible(false);
+                                break;
+                        }
+                    }
+                }
+            });
+
             //set component bounds (only needed by Absolute Positioning)
             cardBox.setBounds (30, 60, 280, 25);
             stateBox.setBounds (30, 120, 280, 25);
@@ -223,11 +309,11 @@ public class ClientMenuGUI extends JPanel {
         return this;
     }
 
-    public ClientMenuGUI ClientShowCardHistoryGUI(final JDialog mainWindow){
+    public ClientMenuGUI ClientShowCardHistoryGUI(final JDialog mainWindow, JDialog projectWindow){
 
             //construct preComponents
-            String[] jcomp1Items = {"Meme - Todo", "RCL - Done", "SERVER - Todo"};
-
+            String[] jcomp1Items = client.showCards(project);
+            if(jcomp1Items[0].compareTo("NO-CARDS-ERROR") == 0) jcomp1Items[0] = "";
             //construct components
             cardBox = new JComboBox (jcomp1Items);
             selectCardLabel = new JLabel ("Seleziona card");
@@ -247,23 +333,21 @@ public class ClientMenuGUI extends JPanel {
             selectCardLabel.setBounds (30, 35, 140, 25);
             showHistoryButton.setBounds (30, 120, 165, 35);
 
-        cardBox.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent ae) {
-                String selectedValue = cardBox.getSelectedItem().toString();
-                JOptionPane.showMessageDialog(null, "Hai selezionato " + selectedValue, "Errore", JOptionPane.ERROR_MESSAGE);
-
-
-            }
-        });
 
         showHistoryButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent ae) {
 
-
-                JDialog cardHistoryDialog = new JDialog (mainWindow,"MyPanel", true);
+                String selectedCard = cardBox.getSelectedItem().toString();
+                if(selectedCard.compareTo("") != 0){
+                JDialog cardHistoryDialog = new JDialog (mainWindow,"History card " + selectedCard, true);
                 cardHistoryDialog.setDefaultCloseOperation (JFrame.HIDE_ON_CLOSE);
                     //construct preComponents
-                    String[] jcomp1Items = {"Todo - 12/12/2020 09:45 ", "Toberevised - 12/11/2020 11:45", "Done - 25/12/2020 11:55 "};
+                    String[] jcomp1Items = client.getCardHistory(project,selectedCard);
+                    if(jcomp1Items == null) {
+                        JOptionPane.showMessageDialog(null, "Progetto eliminato da un altro utente!", "Impossibile completare l´operazione", JOptionPane.ERROR_MESSAGE);
+                        projectWindow.setVisible(false);
+                    } else {
+                            //{"Todo - 12/12/2020 09:45 ", "Toberevised - 12/11/2020 11:45", "Done - 25/12/2020 11:55 "};
 
                     //construct components
                     historyList = new JList (jcomp1Items);
@@ -283,8 +367,10 @@ public class ClientMenuGUI extends JPanel {
                 cardHistoryDialog.pack();
                 cardHistoryDialog.setVisible (true);
 
-            }});
+            }}}});
 
         return this;
     }
 }
+
+

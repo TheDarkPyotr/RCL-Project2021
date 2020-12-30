@@ -1,7 +1,4 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.rmi.*;             // Classes and support for RMI
@@ -21,9 +18,11 @@ public class Server extends RemoteServer implements WorthRegisterServiceInterfac
 
 
 
+
     public Server(int port) throws RemoteException {
 
         //First data load from file
+
         userList = new HashMap<String, String>();
         registerServiceLauncher(port, this);
 
@@ -50,8 +49,6 @@ public class Server extends RemoteServer implements WorthRegisterServiceInterfac
             try{
                 s= ss2.accept();
                 System.out.println("[SERVER] New connection established");
-                projectList = new ArrayList<Project>();
-
 
                 ServerThread clientThread=new ServerThread(s,dataContainer);
                 clientThread.start();
@@ -66,7 +63,6 @@ public class Server extends RemoteServer implements WorthRegisterServiceInterfac
 
 
     }
-
 
 
     public static void main(String args[]) throws RemoteException {
