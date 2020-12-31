@@ -28,7 +28,7 @@ public class ChatReceiverThread extends Thread{
                 DatagramPacket dp=new DatagramPacket(buffer,buffer.length);
                 local.receive(dp);
                 String s = new String(dp.getData());
-                System.out.println("[CLIENT] Received: " + s);
+                System.out.println("[CHAT LISTENER] Received: " + s);
 
                 client.chatHistorySaver(project,s+ "\n");
 

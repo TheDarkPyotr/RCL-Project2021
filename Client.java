@@ -1,35 +1,26 @@
-import sun.misc.Signal;
-
 import javax.swing.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.*;
-import java.net.UnknownHostException;
 import java.rmi.*;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.RemoteObject;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+
 
 
 
 public class Client extends RemoteObject implements UserUpdateNotify {
 
     private static int port;
-
-    private InetAddress address=null;
-    private Socket s1=null;
-    private String line=null;
-    private BufferedReader br=null;
-    private BufferedReader is=null;
-    private PrintWriter os=null;
+    private Socket serverSocket = null;
+    private String line = null;
+    private BufferedReader is = null;
+    private PrintWriter os = null;
     private ServerInterface serverNotifier = null;
     private UserUpdateNotify stubNotifier = null;
     private HashMap<String,String> userList;
@@ -37,32 +28,44 @@ public class Client extends RemoteObject implements UserUpdateNotify {
     private String authenticatedUsername = null;
     private HashMap<String, MulticastSocket> multicastRegister;
     private HashMap<String, ChatReceiverThread>  chatListener;
+    private final String SERVER_ADDR = "192.168.1.208";
 
     private HashMap<String,String> chatHistory;
 
-    public Client(int port) throws UnknownHostException, IOException {
+    public Client(int port) throws IOException {
 
         super();
-        address=InetAddress.getLocalHost();
+        InetAddress address = InetAddress.getByName(SERVER_ADDR);
         this.port = port;
 
+        System.out.println("[CLIENT] Trying to establish TCP connection with server at " + address.getCanonicalHostName());
 
-            s1=new Socket(address, 2021); // You can use static final constant PORT_NUM
-            br= new BufferedReader(new InputStreamReader(System.in));
-            is=new BufferedReader(new InputStreamReader(s1.getInputStream()));
-            os= new PrintWriter(s1.getOutputStream());
-            userList = new HashMap<>();
-            multicastRegister = new HashMap<>();
-            chatHistory = new HashMap<>();
-            chatListener = new HashMap<>();
+            try{
+                serverSocket = new Socket(address, 2021);
+                is = new BufferedReader(new InputStreamReader(serverSocket.getInputStream()));
+                os = new PrintWriter(serverSocket.getOutputStream());
+
+            }catch(Exception e){
+                //e.printStackTrace();
+                JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+                System.out.println("[CLIENT] ERRORE: Impossibile contattare il server, chiusura in corso...\n");
+                System.exit(1);
+            }
+
+        System.out.println("[CLIENT] Connection with server established!\n");
+
+        userList = new HashMap<>();
+        multicastRegister = new HashMap<>();
+        chatHistory = new HashMap<>();
+        chatListener = new HashMap<>();
 
 
     }
 
-    public Integer moveCard(String projectName, String cardName, String destinationList){
+    public Integer moveCard(String projectName, String cardName, String destinationList) {
 
-        String response=null;
-        Integer status = -1;
+        String response = null;
+        int status = -1;
         try{
             line= "MOVE-CARD-REQUEST#" +projectName+"#"+cardName+"#"+destinationList;
 
@@ -70,7 +73,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             os.flush();
             response=is.readLine();
             System.out.println("[CLIENT] Move project card request - parameters: "+projectName+"#"+cardName+"#"+destinationList);
-            System.out.println("[CLIENT] Server Response : "+response);
+            System.out.println("[CLIENT] Server Response : "+response +  "\n");
 
            switch(response){
 
@@ -97,9 +100,16 @@ public class Client extends RemoteObject implements UserUpdateNotify {
 
 
         }
-        catch(IOException e){
-            e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
+        catch(IOException | NullPointerException ex){
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            System.exit(1);
+            //ex.printStackTrace();
+            //System.out.println("[CLIENT] Socket read Error");
         }
 
         return status;
@@ -117,7 +127,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             os.flush();
             response=is.readLine();
             System.out.println("[CLIENT] Show card history - parameters: "+projectName+"#"+cardName);
-            System.out.println("[CLIENT] Server Response : "+response);
+            System.out.println("[CLIENT] Server Response : "+response + "\n");
 
             if(response.compareTo("PROJECT-ELIMINATED") == 0) return null;
             else {
@@ -127,9 +137,15 @@ public class Client extends RemoteObject implements UserUpdateNotify {
 
 
         }
-        catch(IOException e){
-            e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
+        catch(IOException | NullPointerException e){
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            System.exit(1);
+
         }
 
 
@@ -140,6 +156,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
     public Integer addMember(String projectName, String memberName){
 
         String response=null;
+        int status = 0;
         try{
             line= "ADD-MEMBER-REQUEST#" +projectName+"#"+memberName;
 
@@ -147,16 +164,22 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             os.flush();
             response=is.readLine();
             System.out.println("[CLIENT] Show project cards - parameters: "+projectName+"#"+memberName);
-            System.out.println("[CLIENT] Server Response : "+response);
+            System.out.println("[CLIENT] Server Response : "+response+ "\n");
 
+            if(response.compareTo("ALREADY-MEMBER") == 0) status = 2;
         }
-        catch(IOException e){
-            e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
+        catch(IOException | NullPointerException e){
+
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            System.exit(1);
         }
 
-        if(response.compareTo("ALREADY-MEMBER") == 0) return 2;
-        return 0;
+        return status;
 
     }
 
@@ -170,16 +193,21 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             os.flush();
             response=is.readLine();
             System.out.println("[CLIENT] Show project cards - parameters: "+projectName+"#"+cardName);
-            System.out.println("[CLIENT] Server Response : "+response);
+            System.out.println("[CLIENT] Server Response : "+response + "\n");
 
             String delims = "[#]+";
             cardList = response.split(delims);
 
 
         }
-        catch(IOException e){
-            e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
+        catch(IOException | NullPointerException e){
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            System.exit(1);
         }
 
         if(response.compareTo("ERROR") == 0) return null;
@@ -197,16 +225,21 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             os.flush();
             response=is.readLine();
             System.out.println("[CLIENT] Show project cards - parameters: "+projectName);
-            System.out.println("[CLIENT] Server Response : "+response);
+            System.out.println("[CLIENT] Server Response : "+response+ "\n");
 
             String delims = "[#]+";
             cardList = response.split(delims);
 
 
         }
-        catch(IOException e){
-            e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
+        catch(IOException | NullPointerException e){
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            System.exit(1);
         }
 
         if(response.compareTo("ERROR") == 0) return null;
@@ -225,16 +258,21 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             os.flush();
             response=is.readLine();
             System.out.println("[CLIENT] Show member of project - parameters: "+projectName);
-            System.out.println("[CLIENT] Server Response : "+response);
+            System.out.println("[CLIENT] Server Response : "+response+ "\n");
 
             String delims = "[#]+";
             memberList = response.split(delims);
 
 
         }
-        catch(IOException e){
-            e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
+        catch(IOException | NullPointerException e){
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            System.exit(1);
         }
 
         if(response.compareTo("ERROR") == 0) return null;
@@ -246,72 +284,72 @@ public class Client extends RemoteObject implements UserUpdateNotify {
         String[] projectWithMulticast = null;
         String[] projectWithoutMulticast = null;
 
-        String response=null;
+        String response="OK";
+        Integer status = 1;
         try{
-            if(!logged) username =  "";
 
-            projectWithMulticast = this.listProjects(authenticatedUsername,true);
-            projectWithoutMulticast = this.listProjects(authenticatedUsername,false);
+            if(!logged) username =  "";
+            else {
+                projectWithMulticast = this.listProjects(authenticatedUsername, true);
+                projectWithoutMulticast = this.listProjects(authenticatedUsername, false);
+            }
+
             line= "LOGOUT-REQUEST#" +username;
 
             os.println(line);
             os.flush();
-            response=is.readLine();
-            System.out.println("[CLIENT] Logout request - parameters: "+username);
-            System.out.println("[CLIENT] Server Response : "+response);
+            if(logged) {
+
+                response = is.readLine();
+                System.out.println("[CLIENT] Logout request - parameters: " + username);
+                System.out.println("[CLIENT] Server Response : " + response+ "\n");
+
+                if(response.compareTo("ERROR") == 0) status = 1;
+                else if(response.compareTo("OK") == 0 && username.compareTo("") != 0) {
 
 
+                    String projectMulticastIP;
 
-        }
-        catch(IOException e){
-            e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
-        }
+                    if (projectWithoutMulticast != null && projectWithMulticast != null) {
+                        for (String projectName : projectWithoutMulticast) {
 
-        if(response.compareTo("ERROR") == 0) return 1;
-        else if(response.compareTo("OK") == 0 && username.compareTo("") != 0){
+                            MulticastSocket receiver = null;
 
+                            int projectIndex = 1;
+                            for (int i = 0; i < projectWithMulticast.length; i += 2) {
+                                if (projectWithMulticast[i].compareTo(projectName) == 0) projectIndex = i + 1;
+                            }
 
-            String projectMulticastIP;
+                            ChatReceiverThread chatThread = null;
+                            JTextArea messageListBoxArea = new JTextArea(1, 1); //Fake text area for history update
+                            if (this.isListenerRegistered(projectName)) {
 
-            if(projectWithoutMulticast != null && projectWithMulticast != null) {
-                for (String projectName : projectWithoutMulticast) {
+                                chatThread = this.getListenerThread(projectName);
+                                if (chatThread.isAlive()) chatThread.interrupt();
+                            }
 
-                    MulticastSocket receiver = null;
-
-                    int projectIndex = 1;
-                    for (int i = 0; i < projectWithMulticast.length; i += 2) {
-                        if (projectWithMulticast[i].compareTo(projectName) == 0) projectIndex = i + 1;
-                    }
-
-
-                    try {
-                        receiver = this.multicastAdd(projectWithMulticast[projectIndex]);
-                        projectMulticastIP = projectWithMulticast[projectIndex];
-                    } catch (IOException e) {
-                        e.printStackTrace();
-
-                    }
-
-
-                    ChatReceiverThread chatThread = null;
-                    JTextArea messageListBoxArea = new JTextArea(1, 1); //Fake text area for history update
-                    if (this.isListenerRegistered(projectName)) {
-
-                        chatThread = this.getListenerThead(projectName);
-                        if(chatThread.isAlive()) chatThread.interrupt();
+                        }
                     }
 
                 }
-            }
-
-
 
             serverNotifier.unregisterForCallback(stubNotifier,username);
             return 0;
 
-        } else if(response.compareTo("OK") == 0) return 0;
-        return 1;
+        } else if(response.compareTo("OK") == 0) status = 0;
+
+        } catch(IOException | NullPointerException e){
+            //e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            System.exit(1);
+        }
+
+        return status;
     }
 
     public Integer addCard(String projectName, String cardName, String descrizione){
@@ -324,14 +362,19 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             os.flush();
             response=is.readLine();
             System.out.println("[CLIENT] Create card request - parameters: "+projectName + "#" + cardName +  "#"+descrizione);
-            System.out.println("[CLIENT] Server Response : "+response);
+            System.out.println("[CLIENT] Server Response : "+response+ "\n");
 
 
 
         }
-        catch(IOException e){
-            e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
+        catch(IOException | NullPointerException e){
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            System.exit(1);
         }
 
         if(response.compareTo("CARD-DUPLICATE-ERROR") == 0) return 1;
@@ -347,7 +390,8 @@ public class Client extends RemoteObject implements UserUpdateNotify {
     }
     public Integer cancelProject(String projectName){
 
-        String response=null;
+        String response = null;
+        int status = 1;
         try{
             line= "CANCEL-PROJECT-REQUEST#" +projectName;
 
@@ -355,23 +399,22 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             os.flush();
             response=is.readLine();
             System.out.println("[CLIENT] Cancel project request - parameters: "+projectName);
-            System.out.println("[CLIENT] Server Response : "+response);
+            System.out.println("[CLIENT] Server Response : "+response+ "\n");
 
+        if(response.compareTo("CARD-STATUS-ERROR") == 0) status = 1;
+        else if(response.compareTo("OK") == 0) status = 0;
 
-
+        }catch(IOException e) {
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO6", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            System.exit(1);
         }
-        catch(IOException e){
-            e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
-        }
 
-        if(response.compareTo("CARD-STATUS-ERROR") == 0) return 1;
-        else if(response.compareTo("OK") == 0){
-
-            return 0;
-
-        }
-        return 1;
+        return status;
 
     }
 
@@ -435,20 +478,13 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             os.println(line);
             os.flush();
             response=is.readLine();
-            System.out.println("[CLIENT] List project - parameters: "+username);
-            System.out.println("[CLIENT] Server Response : "+response);
+            System.out.println("[CLIENT "+ username + "] List project - parameters: "+username);
+            System.out.println("[CLIENT] Server Response : "+response +  "\n");
 
             if(multicastGroup && response.compareTo("") != 0){
 
                 String delims = "[#]+";
                 projectListWithIP = response.split(delims);
-
-                for (int i = 0; i < projectListWithIP.length; i+=2) {
-
-
-                    System.out.println("[CLIENT] Project name: " + projectListWithIP[i] +  " multicast IP: " + projectListWithIP[i+1]);
-
-                }
 
 
             } else if(response.compareTo("") != 0){
@@ -456,20 +492,23 @@ public class Client extends RemoteObject implements UserUpdateNotify {
                 String delims = "[#]+";
                 projectListWithIP = response.split(delims);
                 projectListWithoutIP = new String[(projectListWithIP.length/2)];
+
                 for (int i = 0; i < projectListWithIP.length/2; i++) {
-
-                    //if(i == 0) projectListWithoutIP[i] = projectListWithIP[i*2];
                     projectListWithoutIP[i] = projectListWithIP[i*2];
-                    System.out.println("[CLIENT] Project name: " + projectListWithIP.length/2 +projectListWithoutIP[i]);
-
                 }
             }
 
 
         }
-        catch(IOException e){
+        catch(IOException | NullPointerException e){
             e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            System.exit(1);
         }
 
         if(response.compareTo("ERROR") == 0) return null;
@@ -481,8 +520,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
 
     public boolean isListenerRegistered(String project){
 
-        if(!chatListener.containsKey(project)) return false;
-        else return true;
+        return chatListener.containsKey(project);
 
     }
 
@@ -490,7 +528,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
         chatListener.put(project,listener);
     }
 
-    public ChatReceiverThread getListenerThead(String project){
+    public ChatReceiverThread getListenerThread(String project){
 
         return chatListener.get(project);
     }
@@ -514,7 +552,8 @@ public class Client extends RemoteObject implements UserUpdateNotify {
         if(multicastRegister.containsValue(multicastIP)) return true;
         return false;
     }
-    public MulticastSocket multicastAdd(String multicastIP) throws IOException {
+
+    public MulticastSocket multicastAdd(String multicastIP) {
 
 
         if (multicastRegister.containsValue(multicastIP)) return multicastRegister.get(multicastIP);
@@ -528,8 +567,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
                 group = InetAddress.getByName(multicastIP);
 
             } catch (Exception e) {
-
-                System.out.println("Uso:java TimeClient multicast_address port [server default setting: 228.5.6.7:6789] ");
+                e.printStackTrace();
                 System.exit(1);
             }
 
@@ -540,20 +578,28 @@ public class Client extends RemoteObject implements UserUpdateNotify {
                 //ms.setTimeToLive(1);
                 chatReceiver.joinGroup(group);
 
-                multicastRegister.put(multicastIP,chatReceiver);
+                multicastRegister.put(multicastIP, chatReceiver);
                 return chatReceiver;
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
+            } catch (IOException | NullPointerException e) {
 
-       return null;
+                JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+                try {
+                    serverSocket.close();
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+                System.exit(1);
+            }
+
+            return null;
+        }
     }
 
     public Integer createProject(String name){
 
 
         String response=null;
+        int status = 2;
         try{
             line= "CREATE-PROJECT-REQUEST#" +name;
 
@@ -561,23 +607,25 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             os.flush();
             response=is.readLine();
             System.out.println("[CLIENT] Create new project request - parameters: "+name);
-            System.out.println("[CLIENT] Server Response : "+response);
+            System.out.println("[CLIENT] Server Response : "+response + "\n");
 
+            if(response.compareTo("PROJECT-TITLE-ERROR") == 0) status = 1;
+            else if(response.compareTo("OK") == 0) status = 0;
 
+        } catch(IOException | NullPointerException e){
 
-        }
-        catch(IOException e){
             e.printStackTrace();
-            System.out.println("[CLIENT] Socket read Error");
-        }
-
-        if(response.compareTo("PROJECT-TITLE-ERROR") == 0) return 1;
-        else if(response.compareTo("OK") == 0) return 0;
-        return 2;
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) { ex.printStackTrace(); }
+            System.exit(1);
+    }
+        return status;
     }
 
 
-    public String login(String username, String password) throws IOException, NotBoundException {
+    public String login(String username, String password) throws NotBoundException {
 
 
         String response=null;
@@ -587,10 +635,9 @@ public class Client extends RemoteObject implements UserUpdateNotify {
                 os.println(line);
                 os.flush();
                 response=is.readLine();
+
             System.out.println("[CLIENT] Login request - parameters: "+username + " **********");
-            System.out.println("[CLIENT] Server Response : "+response);
-
-
+            System.out.println("[CLIENT] Server Response : "+response+ "\n");
 
             String delims = "[#]+";
             String[] tokens = response.split(delims);
@@ -598,11 +645,11 @@ public class Client extends RemoteObject implements UserUpdateNotify {
 
 
                 System.out.println("[CLIENT - WORTH-UPDATE-SERVICE] Looking for registry service on port " + this.port);
-                Registry registry = LocateRegistry.getRegistry(this.port);
+                Registry registry = LocateRegistry.getRegistry(SERVER_ADDR,this.port);
                 serverNotifier =(ServerInterface) registry.lookup("WORTH-UPDATE-SERVICE");
 
                 /* si registra per la callback */
-                System.out.println("[CLIENT - WORTH-UPDATE-SERVICE] Registering for callback on WORTH-UPDATE-SERVICE");
+                System.out.println("[CLIENT - WORTH-UPDATE-SERVICE] Registering for callback on WORTH-UPDATE-SERVICE\n");
 
 
                 stubNotifier = (UserUpdateNotify) UnicastRemoteObject.exportObject(this, 0);
@@ -610,9 +657,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
 
                 for (int i = 1; i < tokens.length; i = i + 2) {
                     if (tokens[i-1] != null && tokens[i] != null) userList.put(tokens[i-1], tokens[i]);
-                    System.out.println("tokens[" + i + "] = " + tokens[i-1] + "tokens[" + i + "+1] = " + tokens[i]);
                 }
-
 
                 authenticatedUsername = username;
                 userList.replace(username, "online");
@@ -631,15 +676,8 @@ public class Client extends RemoteObject implements UserUpdateNotify {
                             if (projectWithMulticast[i].compareTo(projectName) == 0) projectIndex = i + 1;
                         }
 
-
-                        try {
                             receiver = this.multicastAdd(projectWithMulticast[projectIndex]);
                             projectMulticastIP = projectWithMulticast[projectIndex];
-                        } catch (IOException e) {
-                            e.printStackTrace();
-
-                        }
-
 
                         ChatReceiverThread chatThread = null;
                         JTextArea messageListBoxArea = new JTextArea(1, 1); //Fake text area for history update
@@ -648,19 +686,22 @@ public class Client extends RemoteObject implements UserUpdateNotify {
                             chatThread = new ChatReceiverThread(receiver, messageListBoxArea, this, projectName);
                             this.registerListener(projectName, chatThread);
                             chatThread.start();
-                        } else this.getListenerThead(projectName).updateBoxArea(messageListBoxArea);
+                        } else this.getListenerThread(projectName).updateBoxArea(messageListBoxArea);
 
                     }
                 }
 
-                }
-
-
+            }
 
         }
-        catch(IOException e){
-            e.printStackTrace();
-            System.out.println("Socket read Error");
+        catch(IOException | NullPointerException e){
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) {
+                ex.printStackTrace();
+            }
+            System.exit(1);
         }
 
 
@@ -676,21 +717,42 @@ public class Client extends RemoteObject implements UserUpdateNotify {
         Integer response = -11;
         try {
 
-
-            Registry r = LocateRegistry.getRegistry(port);
+            System.out.println("[CLIENT] Register request - parameters: "+username + " **********");
+            Registry r = LocateRegistry.getRegistry(SERVER_ADDR,port);
             RemoteObject = r.lookup("WORTH-SERVER");
             serverObject = (WorthRegisterServiceInterface) RemoteObject;
 
             response = serverObject.register(username, password);
+            String responseCode = "ERROR";
+            switch(response){
 
+                case 0:
+                    responseCode = "OK";
+                    break;
+
+                case 1:
+                    responseCode = "USERNAME-DUPLICATED";
+                    break;
+
+                case 2:
+                    responseCode = "USERNAME-PSW-SAME";
+                    break;
+
+            }
+
+            System.out.println("[CLIENT] Server response: "+responseCode + "\n");
             return response;
 
 
 
         }
         catch (Exception e) {
-            System.out.println("[CLIENT ERROR]: response " + response + e.toString() + " - (" + e.getMessage() +")\n");
             e.printStackTrace();
+            JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
+            try {
+                serverSocket.close();
+            } catch (IOException ex) { ex.printStackTrace(); }
+            System.exit(1);
         }
 
         return -1;
@@ -702,7 +764,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
 
         if(userList.containsKey(username)) userList.replace(username, status);
         else userList.put(username,status);
-        String returnMessage = "[CLIENT] Update event received from server with data: " + username +  " - " + status;
+        String returnMessage = "[CLIENT - RMI CALLBACK NOTIFY SERVICE] Update event received from server with data: " + username +  " - " + status;
         System.out.println(returnMessage);
     }
 }

@@ -21,19 +21,23 @@ class ServerThread extends Thread{
     ArrayList<Project> projectList;
 
     public ServerThread(Socket s, DataManager dataContainer){
-        this.s=s;
+
+        this.s = s;
         this.data = dataContainer;
     }
 
     public void run() {
 
+        System.out.println("[SERVER THREAD " + currentThread().getId()+  "] New connection established with " + s.getInetAddress());
 
 
         try {
             is = new BufferedReader(new InputStreamReader(s.getInputStream()));
             os = new PrintWriter(s.getOutputStream());
+
         } catch (IOException e) {
             System.out.println("IO error in server thread");
+            System.exit(1);
         }
 
         request = "LOOP";
@@ -41,14 +45,14 @@ class ServerThread extends Thread{
 
 
             try {
-
                     request = is.readLine();
-
                     String delims = "[#]+";
                     tokens = request.split(delims);
 
-
             } catch (IOException e) {
+
+                System.out.println("[SERVER THREAD " + currentThread().getId()+  "] ERROR: request loop error!");
+                e.printStackTrace();
 
             }
 
@@ -58,7 +62,7 @@ class ServerThread extends Thread{
                 case "LOGIN-REQUEST":
 
                     list = this.data.getUserList();
-                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
+                    System.out.println("[SERVER THREAD " + currentThread().getId()+ "]  Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
                     response =  "";
 
 
@@ -88,27 +92,23 @@ class ServerThread extends Thread{
 
                     os.println(response);
                     os.flush();
-                    System.out.println("[SERVER] Response to login request from" + s.getInetAddress() + " with: " + response);
+                    System.out.println("[SERVER THREAD " + currentThread().getId()+ "] Response to login request from" + s.getInetAddress() + " with: " + response +  "\n");
 
                 break;
 
 
                 case "CREATE-PROJECT-REQUEST":
 
-                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: ");
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
 
                     response = "OK";
-                    //if (!list.containsKey(tokens[1])) response = "USERNAME-ERROR";
-                    //else if (list.get(tokens[1]).compareTo(tokens[2]) != 0) response = "PASSWORD-ERROR";
-                    //else response = list.toString();
-
 
                     if (this.data.newProject(tokens[1],authenticatedUsername) == 1)
                         response = "PROJECT-TITLE-ERROR";
 
                     os.println(response);
                     os.flush();
-                    System.out.println("[SERVER] Response to create project request from" + s.getInetAddress() + " with: " + response);
+                    System.out.println("[SERVER] Response to create project request from" + s.getInetAddress() + " with: " + response +  "\n");
 
                     break;
 
@@ -127,12 +127,6 @@ class ServerThread extends Thread{
                             try {
                                 data.setUserStatus(tokens[1], "offline");
 
-                                try {
-                                    data.dataWriter(new File("./storage"));
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                }
-
                             } catch (RemoteException e) {
                                 e.printStackTrace();
                             }
@@ -141,7 +135,7 @@ class ServerThread extends Thread{
 
                     os.println(response);
                     os.flush();
-                    System.out.println("[SERVER] Response to logout request from" + s.getInetAddress() + " with: " + response);
+                    System.out.println("[SERVER] Response to logout request from" + s.getInetAddress() + " with: " + response+  "\n");
                     request =  "EXIT";
 
 
@@ -159,7 +153,7 @@ class ServerThread extends Thread{
 
                     os.println(response);
                     os.flush();
-                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response+  "\n");
 
                     break;
 
@@ -172,14 +166,14 @@ class ServerThread extends Thread{
                     else response = "CARD-STATUS-ERROR";
                     os.println(response);
                     os.flush();
-                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response+  "\n");
 
 
                     break;
 
                 case  "ADD-CARD-REQUEST":
 
-                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]+  "\n");
                     response = "";
                     status = data.addCard(tokens[1], tokens[2], tokens[3]);
                     if(status == 0) response =  "OK";
@@ -187,7 +181,7 @@ class ServerThread extends Thread{
                     else response =  "ERROR";
                     os.println(response);
                     os.flush();
-                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response+  "\n");
 
 
                     break;
@@ -201,7 +195,7 @@ class ServerThread extends Thread{
                     else response = "ALREADY-MEMBER";
                     os.println(response);
                     os.flush();
-                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+                    System.out.println("[SERVER] Response to  " + choice + " request from" + s.getInetAddress() + " with: " + response+  "\n");
 
 
                     break;
@@ -218,7 +212,7 @@ class ServerThread extends Thread{
                     }
                     os.println(response);
                     os.flush();
-                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response+  "\n");
 
                     break;
 
@@ -234,7 +228,7 @@ class ServerThread extends Thread{
                     }
                     os.println(response);
                     os.flush();
-                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+                    System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response+  "\n");
 
                     break;
 
@@ -323,11 +317,14 @@ class ServerThread extends Thread{
 
         try {
             s.close();
-            System.out.println("[SERVER] Shutting down connection with " + s.getInetAddress());
+
+            System.out.println("[SERVER THREAD " + currentThread().getId()+ "]] Shutting down connection with " + s.getInetAddress());
         } catch (IOException e) {
             System.out.println("[SERVER] Error during shutdown connection with " + s.getInetAddress());
             e.printStackTrace();
         }
+
+        System.out.println("[SERVER THREAD " + currentThread().getId()+ "]  Execution terminated, bye!");
     }
 
     public void chatStateUpdater(String projectName, String cardName, String destinationList) throws IOException {

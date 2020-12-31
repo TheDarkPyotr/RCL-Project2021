@@ -51,12 +51,15 @@ public class ClientMenuGUI extends JPanel {
 
         removeCardComponent = new JPanel();
         //construct components
+        int size = 0;
        String[] projectMembers = client.showMembers(project);
+       String[] projectCards = client.showCards(project);
+       if(projectCards[0].compareTo("NO-CARDS-ERROR") != 0) size = projectCards.length;
 
         jcomp1 = new JLabel ("Eliminazione progetto " + project);
         jcomp2 = new JButton ("Elimina");
-        jcomp3 = new JLabel ("Totale cards: " );
-        jcomp4 = new JLabel ("Totale membri:"+ projectMembers.length);
+        jcomp3 = new JLabel ("Totale cards: " + size);
+        jcomp4 = new JLabel ("Totale membri: "+ projectMembers.length);
         jcomp5 = new JLabel ("Sei sicuro di voler elimina il progetto " + project +  "?");
 
         //adjust size and set layout
@@ -74,9 +77,9 @@ public class ClientMenuGUI extends JPanel {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
 
-                if(client.cancelProject(project) == 1) JOptionPane.showMessageDialog(null, "Errore: Cards non ancora ultimate", "Errore: impossibile eliminare " + project, JOptionPane.ERROR_MESSAGE);
+                if(client.cancelProject(project) == 1) JOptionPane.showMessageDialog(null, "Errore: non tutte le card sono nella lista done!", "Errore: impossibile eliminare " + project, JOptionPane.ERROR_MESSAGE);
                 else {
-                    JOptionPane.showMessageDialog(null, "Progetto eliminato", "Progetto eliminato con successo" + project, JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(null, "Progetto eliminato", "Progetto eliminato con successo" + project, JOptionPane.INFORMATION_MESSAGE);
                 dashWindow.setVisible(false);
                 }
             }
@@ -85,7 +88,7 @@ public class ClientMenuGUI extends JPanel {
         //set component bounds (only needed by Absolute Positioning)
         jcomp1.setBounds (15, 15, 800, 25);
         jcomp2.setBounds (15, 160, 165, 40);
-        jcomp3.setBounds (15, 50, 100, 25);
+        jcomp3.setBounds (15, 50, 200, 25);
         jcomp4.setBounds (15, 75, 115, 25);
         jcomp5.setBounds (15, 100, 800, 25);
 
@@ -129,7 +132,7 @@ public class ClientMenuGUI extends JPanel {
                     else {
                         int response = client.addCard(project, cardName, cardDesc);
                         if(response == 0){
-                            JOptionPane.showMessageDialog(null, "Card inserita con successo", "OK", JOptionPane.ERROR_MESSAGE);
+                            JOptionPane.showMessageDialog(null, "Card inserita con successo", "OK", JOptionPane.INFORMATION_MESSAGE);
 
                             //Update show cards
                             cardListPanel.removeAll();
@@ -279,7 +282,7 @@ public class ClientMenuGUI extends JPanel {
                         Integer response = client.moveCard(project, cardBox.getSelectedItem().toString(), stateBox.getSelectedItem().toString());
                         switch (response) {
                             case 0:
-                                JOptionPane.showMessageDialog(null, "Modifica salvata con successo", "OK", JOptionPane.ERROR_MESSAGE);
+                                JOptionPane.showMessageDialog(null, "Modifica salvata con successo", "OK", JOptionPane.INFORMATION_MESSAGE);
                                 break;
                             case 1:
                                 JOptionPane.showMessageDialog(null, "Card giá in stato " + stateBox.getSelectedItem().toString(), "ERRORE", JOptionPane.ERROR_MESSAGE);

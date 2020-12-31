@@ -9,10 +9,7 @@ import java.io.IOException;
 import java.net.*;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
-import java.util.HashMap;
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import javax.swing.event.*;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
@@ -269,18 +266,23 @@ public class ClientGUI extends JPanel {
                             }
 
 
-                            try {
                                 receiver = clientProcessor.multicastAdd(projectWithMulticast[projectIndex]);
                                 projectMulticastIIP[0] = projectWithMulticast[projectIndex];
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
+
 
 
                             JDialog showChatProjectDialog = new JDialog(mainWindow, "Project " + selectedProject + " chat ", true);
                             showChatProjectDialog.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
 
-                            String[] memberListComboBoxItems = clientProcessor.listOnlineUsers();
+                            String[] userList = clientProcessor.listUsers();
+                            String[] memberListComboBoxItems = new String[userList.length];
+                            for (int i=0; i < userList.length; i++) {
+
+                                String[] tokens = userList[i].split("[ (]+");
+                                memberListComboBoxItems[i] = tokens[0];
+
+
+                            }
                             String[] userListComboBoxItems = clientProcessor.showMembers(selectedProject);
 
                             //construct components
@@ -324,10 +326,10 @@ public class ClientGUI extends JPanel {
 
                             if(!clientProcessor.isListenerRegistered(selectedProject)) {
 
-                                chatThread =  new ChatReceiverThread(receiver, messageListBoxArea, clientProcessor, selectedProject);
+                                chatThread = new ChatReceiverThread(receiver, messageListBoxArea, clientProcessor, selectedProject);
                                 clientProcessor.registerListener(selectedProject,chatThread);
                                 chatThread.start();
-                            } else clientProcessor.getListenerThead(selectedProject).updateBoxArea(messageListBoxArea);
+                            } else clientProcessor.getListenerThread(selectedProject).updateBoxArea(messageListBoxArea);
 
 
 
@@ -863,7 +865,6 @@ public class ClientGUI extends JPanel {
                 else {
                     try {
                         String response = clientProcessor.login(username,password);
-                        System.out.println(response); //restituisce stringa con utenti e stato (online/offline)
 
                         if (response.compareTo("USERNAME-ERROR") == 0)
                             JOptionPane.showMessageDialog(null, "Errore: username non valido", "Errore", JOptionPane.ERROR_MESSAGE);
@@ -880,7 +881,7 @@ public class ClientGUI extends JPanel {
                         }
 
 
-                    } catch (IOException | NotBoundException e) {
+                    } catch (NotBoundException e) {
                         e.printStackTrace();
                     }
 

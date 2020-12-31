@@ -1,3 +1,5 @@
+import sun.misc.Signal;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -21,43 +23,52 @@ public class Server extends RemoteServer implements WorthRegisterServiceInterfac
 
     public Server(int port) throws RemoteException {
 
-        //First data load from file
-
-        userList = new HashMap<String, String>();
         registerServiceLauncher(port, this);
-
         serverUpdate = new ServerUpdateNotify( );
         callbackRegisterLauncher(port,serverUpdate);
 
-
         dataContainer = new DataManager(serverUpdate);
 
-        Socket s=null;
+
+        Signal.handle(new Signal("INT"),  // SIGINT
+                signal -> {
+
+                    try {
+                        dataContainer.shutdown();
+                    } catch (IOException e) {
+                        System.out.println("[SERVER SHUTDOWN SERVICE] FATAL ERROR DURING DATA SAVING, FAIL TO SAVE!");
+                        e.printStackTrace();
+                    }
+                    System.exit(0);
+
+                });
+
+
+
+        Socket s = null;
         ServerSocket ss2=null;
-        System.out.println("[SERVER] Listening on 2021");
+        System.out.println("[MAIN SERVER] Listening connection on port 2021");
         try{
-            ss2 = new ServerSocket(2021); // can also use static final PORT_NUM , when defined
+            ss2 = new ServerSocket(2021);
 
         }
         catch(IOException e){
             e.printStackTrace();
-            System.out.println("[ERROR] Error during establishing connection on 2021 port");
+            System.out.println("[MAIN SERVER] ERROR: Error during establishing connection on 2021 port");
+
 
         }
 
         while(true){
             try{
                 s= ss2.accept();
-                System.out.println("[SERVER] New connection established");
-
-                ServerThread clientThread=new ServerThread(s,dataContainer);
+                ServerThread clientThread = new ServerThread(s,dataContainer);
                 clientThread.start();
-
             }
 
             catch(Exception e){
-
-
+                e.printStackTrace();
+                System.exit(1);
             }
         }
 
@@ -66,7 +77,6 @@ public class Server extends RemoteServer implements WorthRegisterServiceInterfac
 
 
     public static void main(String args[]) throws RemoteException {
-
 
 
         int port = 0;
@@ -90,14 +100,14 @@ public class Server extends RemoteServer implements WorthRegisterServiceInterfac
             Registry registry=LocateRegistry.getRegistry(port);
             registry.bind  ("WORTH-UPDATE-SERVICE", stub);
 
-            /*while (true) {
-                int val=(int) (Math.random( )*1000);
-                System.out.println("nuovo update"+val);
-                server.update(val);
-                Thread.sleep(1500);
-            }*/
+            System.out.println("[RMI CALLBACK NOTIFY SERVICE] Notify service launched on port "+ 39000);
 
-        } catch (Exception e) { System.out.println("Eccezione" +e);}
+
+
+        } catch (Exception e) {
+            System.out.println("[RMI CALLBACK NOTIFY SERVICE] ERRORE: " +e);
+            System.exit(1);
+        }
     }
 
     private void registerServiceLauncher(int port,Server registryInstance){
@@ -105,13 +115,12 @@ public class Server extends RemoteServer implements WorthRegisterServiceInterfac
 
             /* Esportazione dell'Oggetto */
             WorthRegisterServiceInterface stub = (WorthRegisterServiceInterface) UnicastRemoteObject.exportObject(registryInstance, 0);
-            // Creazione di un registry sulla porta args[0]
 
             LocateRegistry.createRegistry(port);
             Registry r = LocateRegistry.getRegistry(port);
             /* Pubblicazione dello stub nel registry */
             r.rebind("WORTH-SERVER", stub);
-            System.out.println("[SERVER LAUNCH] Register service launched on port "+ port +"! \n");
+            System.out.println("[RMI REGISTRATION SERVICE] Register service launched on port "+ port);
 
         }
         catch (RemoteException e) {
