@@ -61,34 +61,30 @@ class ServerThread extends Thread{
             switch(choice) {
                 case "LOGIN-REQUEST":
 
-                    list = this.data.getUserList();
                     System.out.println("[SERVER THREAD " + currentThread().getId()+ "]  Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
                     response =  "";
+                    try {
 
+                        status = data.login(tokens[1], tokens[2]);
+                        if (status == 1) response = "USERNAME-ERROR";
+                        else if (status == 2) response = "PASSWORD-ERROR";
+                        else if(status == 3) response = "ONLINE-ERROR";
+                        else if(status == 4) throw new NullPointerException();
+                        else {
 
-                    if (!list.containsKey(tokens[1])) response = "USERNAME-ERROR";
-                    else if (list.get(tokens[1]).compareTo(tokens[2]) != 0) response = "PASSWORD-ERROR";
-                    else if(this.data.getUserOnlineList().containsKey(tokens[1]) && this.data.getUserOnlineList().get(tokens[1]).compareTo("online") == 0) response = "ONLINE-ERROR";
-                    else {
+                                Iterator it = this.data.getUserOnlineList().entrySet().iterator();
+                                while (it.hasNext()) {
+                                     Map.Entry pair = (Map.Entry)it.next();
+                                     response = response.concat(pair.getKey() + "#" + pair.getValue()).concat("#");
+                                }
 
-                        Iterator it = this.data.getUserOnlineList().entrySet().iterator();
-                        while (it.hasNext()) {
-                            Map.Entry pair = (Map.Entry)it.next();
-                           response = response.concat(pair.getKey() + "#" + pair.getValue()).concat("#");
+                                authenticatedUsername = tokens[1];
+                                this.data.setUserStatus(authenticatedUsername, "online");
 
-                        }
-
-                        authenticatedUsername = tokens[1];
-                        try {
-                            this.data.setUserStatus(authenticatedUsername, "online");
-
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-
-
-                    }
-
+                            }
+                    } catch (NullPointerException e) {
+                    e.printStackTrace();
+                }
 
                     os.println(response);
                     os.flush();
@@ -97,39 +93,20 @@ class ServerThread extends Thread{
                 break;
 
 
-                case "CREATE-PROJECT-REQUEST":
-
-                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
-
-                    response = "OK";
-
-                    if (this.data.newProject(tokens[1],authenticatedUsername) == 1)
-                        response = "PROJECT-TITLE-ERROR";
-
-                    os.println(response);
-                    os.flush();
-                    System.out.println("[SERVER] Response to create project request from" + s.getInetAddress() + " with: " + response +  "\n");
-
-                    break;
-
-
                 case "LOGOUT-REQUEST":
 
                     System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: ");
 
                     //Close only TCP Connection, for non-authenticated user
-                    if(tokens.length == 1) response = "OK";
-                     else{
+                    if(tokens.length == 1){
+                        System.out.println("[SERVER THREAD " + currentThread().getId()+ "] Close TCP connection with non authenticated user");
+                        response = "OK";
+                    } else{
                          // Close TCP connection and change user status, for authenticated user
                         if (data.getUserOnlineList().get(tokens[1]).compareTo("offline") == 0) response = "ERROR";
                         else {
                             response = "OK";
-                            try {
-                                data.setUserStatus(tokens[1], "offline");
-
-                            } catch (RemoteException e) {
-                                e.printStackTrace();
-                            }
+                            data.setUserStatus(tokens[1], "offline");
                         }
                     }
 
@@ -149,7 +126,7 @@ class ServerThread extends Thread{
                     if(projectMembers != null){
                         for (String name : projectMembers)
                             response = response.concat(name).concat("#");
-                    }
+                    } else response = "ERROR";
 
                     os.println(response);
                     os.flush();
@@ -162,8 +139,10 @@ class ServerThread extends Thread{
                     System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
                     response = "";
 
-                    if(data.cancelProject(tokens[1])) response =  "OK";
-                    else response = "CARD-STATUS-ERROR";
+                    status = data.cancelProject(tokens[1]);
+                    if(status == 0) response =  "OK";
+                    else if(status == 1) response = "CARD-STATUS-ERROR";
+                    else response = "PROJECT-ELIMINATED";
                     os.println(response);
                     os.flush();
                     System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response+  "\n");
@@ -178,7 +157,7 @@ class ServerThread extends Thread{
                     status = data.addCard(tokens[1], tokens[2], tokens[3]);
                     if(status == 0) response =  "OK";
                     else if(status == 2) response = "PROJECT-ELIMINATED";
-                    else response =  "ERROR";
+                    else response = "CARD-DUPLICATE-ERROR";
                     os.println(response);
                     os.flush();
                     System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response+  "\n");
@@ -191,8 +170,10 @@ class ServerThread extends Thread{
                     System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1] +  " " + tokens[2]);
                     response = "";
 
-                    if(data.addMember(tokens[1],tokens[2]) == 0) response =  "OK";
-                    else response = "ALREADY-MEMBER";
+                    status = data.addMember(tokens[1],tokens[2]);
+                    if(status == 0) response =  "OK";
+                    else if(status == 1) response = "ALREADY-MEMBER";
+                    else response = "ERROR";
                     os.println(response);
                     os.flush();
                     System.out.println("[SERVER] Response to  " + choice + " request from" + s.getInetAddress() + " with: " + response+  "\n");
@@ -287,6 +268,21 @@ class ServerThread extends Thread{
                     os.println(response);
                     os.flush();
                     System.out.println("[SERVER] Response to  " + request + " request from" + s.getInetAddress() + " with: " + response);
+
+                    break;
+
+                case "CREATE-PROJECT-REQUEST":
+
+                    System.out.println("[SERVER] Received " + choice + " request from " + s.getInetAddress() + " with data: " + tokens[1]);
+
+                    response = "OK";
+
+                    if (this.data.newProject(tokens[1],authenticatedUsername) == 1)
+                        response = "PROJECT-TITLE-ERROR";
+
+                    os.println(response);
+                    os.flush();
+                    System.out.println("[SERVER] Response to create project request from" + s.getInetAddress() + " with: " + response +  "\n");
 
                     break;
 

@@ -20,13 +20,14 @@ public class DataManager {
     private static String STORAGE_DIR = "./storage";
 
 
-    private HashMap<String, Project> projectList = new HashMap<>();
+    private HashMap<String, Project> projectList = null;
 
 
     public DataManager(ServerUpdateNotify serverNotifier) {
 
         //Load initial data from file system
         this.mapper = new ObjectMapper();
+        projectList = new HashMap<>();
         allUserListStatus = new HashMap<>();
 
         this.dataRestore(new File(STORAGE_DIR));
@@ -43,6 +44,24 @@ public class DataManager {
         System.out.println("[SERVER DATA MANAGER] Data saved!");
 
     }
+
+    public int login(String username, String password){
+
+        int response = 0;
+        if(username == null || password == null) response = 4;
+        else {
+                synchronized (allUserList) {
+                    if (!allUserList.containsKey(username)) response = 1;
+                    else if (allUserList.get(username).compareTo(password) != 0) response = 2;
+                    else if (this.getUserOnlineList().containsKey(username) && this.getUserOnlineList().get(username).compareTo("online") == 0) response = 3;
+                }
+            }
+
+        return response;
+    }
+
+
+
 
     public void dataWriter(File restoreDir) throws IOException {
 
@@ -283,10 +302,12 @@ public class DataManager {
 
     public void register(String username, String password) {
 
-        System.out.println("[SERVER - DATA MANAGER] New user: " + username + " " + password);
-        allUserList.put(username, password);
-        allUserListStatus.put(username, "offline");
-        System.out.println("[SERVER - DATA MANAGER] User list: " + allUserList.toString());
+        synchronized (allUserList) {
+            System.out.println("[SERVER - DATA MANAGER] New user: " + username + " " + password);
+            allUserList.put(username, password);
+            allUserListStatus.put(username, "offline");
+            System.out.println("[SERVER - DATA MANAGER] User list: " + allUserList.toString());
+        }
 
 
     }
@@ -307,39 +328,55 @@ public class DataManager {
 
     public String getProjectMulticastIP(String projectName) {
 
-        synchronized (projectList.get(projectName)) {
-            Project pr = projectList.get(projectName);
-            if (pr != null) return pr.getMulticastIP();
+        try {
+            synchronized (projectList.get(projectName)) {
+                Project pr = projectList.get(projectName);
+                return pr.getMulticastIP();
+
+            }
+        }catch (Exception e){
             return null;
         }
     }
 
-    public void setUserStatus(String username, String status) throws RemoteException {
+    public void setUserStatus(String username, String status) {
 
         synchronized (allUserListStatus) {
-            allUserListStatus.replace(username, status);
+            if(allUserListStatus.containsKey(username))
+                 allUserListStatus.replace(username, status);
         }
-        serverNotifier.update(username, status);
-
+        try {
+            serverNotifier.update(username, status);
+        }catch (RemoteException e){
+            e.printStackTrace();
+        }
 
     }
 
     public ArrayList<Project> getProjectList(String username) {
 
         ArrayList<Project> userProjectList = new ArrayList<>();
-        for (Project pr : projectList.values()) {
+        synchronized (projectList) {
 
-            if (pr.getMemberList().contains(username)) userProjectList.add(pr);
+            for (Project pr : projectList.values()) {
+
+                if (pr.isMember(username)) userProjectList.add(pr);
+            }
         }
-
         return userProjectList;
     }
 
     public ArrayList<String> getProjectMembers(String project) {
 
-        synchronized (projectList.get(project)) {
-            return projectList.get(project).getMemberList();
+        try{
+            synchronized (projectList.get(project)) {
+                return projectList.get(project).getMemberList();
+            }
+        }catch (Exception e){
+
+            return null;
         }
+
     }
 
     public int newProject(String name, String authorName) {
@@ -370,20 +407,27 @@ public class DataManager {
 
     }
 
-    public boolean cancelProject(String projectName){
+    public int cancelProject(String projectName){
+        int status;
+        try {
+            synchronized (projectList.get(projectName)) {
+                if (projectList.get(projectName).done()) {
 
-            if(projectList.get(projectName).done()){
-
-                projectList.remove(projectName);
-                return true;
+                    projectList.remove(projectName);
+                    status = 0;
+                } else status = 1;
             }
-            return false;
+
+        }catch (Exception e){
+            status = 2;
+        }
+        return status;
     }
 
     public Integer addCard(String project, String cardName, String descrizione){
         Project p = projectList.get(project);
         if(p != null) {
-            if (projectList.get(project).addCard(cardName, descrizione)) return 0;
+            if (p.addCard(cardName, descrizione)) return 0;
             else return 1;
         }
         return 2;
@@ -391,40 +435,46 @@ public class DataManager {
 
     public Integer addMember(String project, String memberName){
 
-        synchronized (projectList.get(project)){
-            if(projectList.get(project).addMember(memberName)) return 0;
-             return 1;
+        if(projectList.containsKey(project)) {
+            synchronized (projectList.get(project)) {
+                if (projectList.get(project).addMember(memberName)) return 0;
+            }
+            return 1;
         }
+        return 2;
     }
 
     public String[] showCards(String projectName){
 
-        String[] stringCardList;
-        ArrayList<String> cardList = projectList.get(projectName).showCards();
-        if(cardList.size() == 0) return null;
-        else {
-            stringCardList = new String[cardList.size()];
-            for (int i = 0; i < cardList.size(); i++) stringCardList[i] = cardList.get(i);
+        String[] stringCardList = null;
+        if (projectList.containsKey(projectName)) {
+
+            ArrayList<String> cardList = projectList.get(projectName).showCards();
+            if(cardList.size() == 0) return null;
+            else stringCardList = cardList.toArray(new String[0]);
         }
         return stringCardList;
     }
 
     public String[] showCard(String projectName, String cardName){
 
-        String[] stringCardInfo;
-        ArrayList<String> cardInfo = projectList.get(projectName).showCard(cardName);
-        if(cardInfo.size() == 0) return null;
-        else {
-            stringCardInfo = new String[cardInfo.size()];
-            for (int i = 0; i < cardInfo.size(); i++) stringCardInfo[i] = cardInfo.get(i);
+        String[] stringCardInfo = null;
+        if (projectList.containsKey(projectName)) {
+            ArrayList<String> cardInfo = projectList.get(projectName).showCard(cardName);
+            if (cardInfo.size() == 0) return null;
+            else {
+                stringCardInfo = new String[cardInfo.size()];
+                for (int i = 0; i < cardInfo.size(); i++) stringCardInfo[i] = cardInfo.get(i);
+            }
         }
         return stringCardInfo;
     }
 
     public Integer moveCard(String projectName, String cardName, String destionationList){
 
-        if(projectList.get(projectName) == null) return 4;
-        return projectList.get(projectName).moveCard(cardName,destionationList);
+        Project p = projectList.get(projectName);
+        if(p == null) return 4;
+        return p.moveCard(cardName,destionationList);
     }
 
     public String[] getCardHistory(String projectName, String cardName){

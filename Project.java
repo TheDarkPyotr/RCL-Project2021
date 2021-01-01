@@ -43,6 +43,11 @@ public class Project{
 
     }
 
+    public boolean isMember(String username){
+        synchronized (userList){
+            return userList.contains(username);
+        }
+    }
     public String toString() {
         return this.nome + "#" + this.userList.toString() + "#" + this.toDoList + "#" + this.inProgressList + "#" + this.toBeRevisedList + "#" + this.doneList + "#" + this.multicastIP;
     }
@@ -72,6 +77,7 @@ public class Project{
     public ArrayList<Card> getDoneList(){
         return this.doneList;
     }
+
     public ArrayList<String> getMemberList(){
 
         return userList;
@@ -136,8 +142,10 @@ public class Project{
 
     public boolean addMember(String memberName){
 
-            if(userList.contains(memberName)) return false;
+        synchronized (userList) {
+            if (userList.contains(memberName)) return false;
             return userList.add(memberName);
+        }
 
     }
 

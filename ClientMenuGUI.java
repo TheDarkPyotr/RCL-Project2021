@@ -77,10 +77,15 @@ public class ClientMenuGUI extends JPanel {
             @Override
             public void actionPerformed(ActionEvent actionEvent) {
 
-                if(client.cancelProject(project) == 1) JOptionPane.showMessageDialog(null, "Errore: non tutte le card sono nella lista done!", "Errore: impossibile eliminare " + project, JOptionPane.ERROR_MESSAGE);
-                else {
+                int status = client.cancelProject(project);
+                if(status == 1) JOptionPane.showMessageDialog(null, "Errore: non tutte le card sono nella lista done!", "Errore: impossibile eliminare " + project, JOptionPane.ERROR_MESSAGE);
+                else if(status == 0){
                     JOptionPane.showMessageDialog(null, "Progetto eliminato", "Progetto eliminato con successo" + project, JOptionPane.INFORMATION_MESSAGE);
                 dashWindow.setVisible(false);
+                }
+                else {
+                    JOptionPane.showMessageDialog(null, "Progetto eliminato da un altro utente", "Progetto giá eliminato!", JOptionPane.INFORMATION_MESSAGE);
+                    dashWindow.setVisible(false);
                 }
             }
         });
@@ -89,7 +94,7 @@ public class ClientMenuGUI extends JPanel {
         jcomp1.setBounds (15, 15, 800, 25);
         jcomp2.setBounds (15, 160, 165, 40);
         jcomp3.setBounds (15, 50, 200, 25);
-        jcomp4.setBounds (15, 75, 115, 25);
+        jcomp4.setBounds (15, 75, 200, 25);
         jcomp5.setBounds (15, 100, 800, 25);
 
         return this;
@@ -127,8 +132,8 @@ public class ClientMenuGUI extends JPanel {
                 String cardName = jcomp21.getText();
                 String cardDesc = jcomp41.getText();
 
-                if(cardName.isEmpty())   JOptionPane.showMessageDialog(null, "Titolo card vuoto!", "Errore", JOptionPane.ERROR_MESSAGE);
-                    else if(cardDesc.isEmpty())   JOptionPane.showMessageDialog(null, "Descrizione card assente!", "Errore", JOptionPane.ERROR_MESSAGE);
+                if(cardName.isEmpty() || cardName.isBlank() || cardName.contains("#"))   JOptionPane.showMessageDialog(null, "Titolo card vuoto!", "Errore", JOptionPane.ERROR_MESSAGE);
+                    else if(cardDesc.isEmpty()|| cardDesc.isBlank() || cardDesc.contains("#"))   JOptionPane.showMessageDialog(null, "Descrizione card assente!", "Errore", JOptionPane.ERROR_MESSAGE);
                     else {
                         int response = client.addCard(project, cardName, cardDesc);
                         if(response == 0){
@@ -136,7 +141,7 @@ public class ClientMenuGUI extends JPanel {
 
                             //Update show cards
                             cardListPanel.removeAll();
-                            cardListPanel.add (new ClientMenuGUI(client, project).ClientShowCardsGUI(mainWindow));
+                            cardListPanel.add (new ClientMenuGUI(client, project).ClientShowCardsGUI(mainWindow,projectWindow));
 
                             //Update move cards
                             moveCardPanel.removeAll();
@@ -171,7 +176,7 @@ public class ClientMenuGUI extends JPanel {
 
 
 
-    public ClientMenuGUI ClientShowCardsGUI(final JFrame mainWindow){
+    public ClientMenuGUI ClientShowCardsGUI(final JFrame mainWindow, JDialog projectDashboard){
 
 
             //construct preComponents
@@ -198,7 +203,10 @@ public class ClientMenuGUI extends JPanel {
                         Object o = theList.getModel().getElementAt(index);
                         if (o.toString().compareTo("") != 0) {
                             String[] cardInfo = client.showCard(project, o.toString());
-
+                            if (cardInfo[0].compareTo("CARD-ERROR") == 0) {
+                                JOptionPane.showMessageDialog(null, "Progetto eliminato!", "ERRORE", JOptionPane.ERROR_MESSAGE);
+                                projectDashboard.setVisible(false);
+                            } else {
 
                             final JDialog showCardDesc = new JDialog(mainWindow, "Descrizione card " + o.toString(), true);
 
@@ -226,6 +234,7 @@ public class ClientMenuGUI extends JPanel {
                             showCardDesc.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
                             showCardDesc.pack();
                             showCardDesc.setVisible(true);
+                        }
 
 
                         }
@@ -350,7 +359,7 @@ public class ClientMenuGUI extends JPanel {
                         JOptionPane.showMessageDialog(null, "Progetto eliminato da un altro utente!", "Impossibile completare l´operazione", JOptionPane.ERROR_MESSAGE);
                         projectWindow.setVisible(false);
                     } else {
-                            //{"Todo - 12/12/2020 09:45 ", "Toberevised - 12/11/2020 11:45", "Done - 25/12/2020 11:55 "};
+
 
                     //construct components
                     historyList = new JList (jcomp1Items);

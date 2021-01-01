@@ -26,7 +26,8 @@ public class ChatReceiverThread extends Thread{
             while(true) {
                 byte [] buffer = new byte[8192];
                 DatagramPacket dp=new DatagramPacket(buffer,buffer.length);
-                local.receive(dp);
+                    local.receive(dp);
+
                 String s = new String(dp.getData());
                 System.out.println("[CHAT LISTENER] Received: " + s);
 
@@ -35,9 +36,10 @@ public class ChatReceiverThread extends Thread{
                 chatbox.append(s+"\n");
 
             }
-        }catch(SocketException es){es.printStackTrace();}
-        catch (IOException ex){
-            System.out.println (ex);
+
+        } catch (IOException e) {
+            System.out.println("[LISTENER THREAD " + currentThread().getId() +  "] Interrupt listening on chat group " + project);
+            currentThread().interrupt();
         }
     }
 

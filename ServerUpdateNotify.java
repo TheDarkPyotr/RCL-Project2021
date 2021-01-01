@@ -8,7 +8,7 @@ public class ServerUpdateNotify extends RemoteObject implements ServerInterface 
     private HashMap<String,UserUpdateNotify> clients;
 
     /* crea un nuovo servente */
-    public ServerUpdateNotify()throws RemoteException {
+    public ServerUpdateNotify() throws RemoteException {
         super();
         clients = new HashMap<String,UserUpdateNotify>( );
     }

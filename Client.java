@@ -28,7 +28,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
     private String authenticatedUsername = null;
     private HashMap<String, MulticastSocket> multicastRegister;
     private HashMap<String, ChatReceiverThread>  chatListener;
-    private final String SERVER_ADDR = "192.168.1.208";
+    private final String SERVER_ADDR = "127.0.0.1";
 
     private HashMap<String,String> chatHistory;
 
@@ -65,7 +65,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
     public Integer moveCard(String projectName, String cardName, String destinationList) {
 
         String response = null;
-        int status = -1;
+        int status = 3;
         try{
             line= "MOVE-CARD-REQUEST#" +projectName+"#"+cardName+"#"+destinationList;
 
@@ -166,7 +166,8 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             System.out.println("[CLIENT] Show project cards - parameters: "+projectName+"#"+memberName);
             System.out.println("[CLIENT] Server Response : "+response+ "\n");
 
-            if(response.compareTo("ALREADY-MEMBER") == 0) status = 2;
+            if(response.compareTo("ALREADY-MEMBER") == 0) status = 1;
+            if(response.compareTo("ERROR") == 0) status = 2;
         }
         catch(IOException | NullPointerException e){
 
@@ -185,7 +186,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
 
     public String[] showCard(String projectName, String cardName){
         String response=null;
-        String[] cardList= null;
+        String[] cardList= new String[1];
         try{
             line= "SHOW-CARD-REQUEST#" +projectName+"#"+cardName;
 
@@ -194,10 +195,10 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             response=is.readLine();
             System.out.println("[CLIENT] Show project cards - parameters: "+projectName+"#"+cardName);
             System.out.println("[CLIENT] Server Response : "+response + "\n");
-
-            String delims = "[#]+";
-            cardList = response.split(delims);
-
+            if(response.compareTo("CARD-ERROR") != 0) {
+                String delims = "[#]+";
+                cardList = response.split(delims);
+            } else cardList[0] = "CARD-ERROR";
 
         }
         catch(IOException | NullPointerException e){
@@ -251,6 +252,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
 
         String response=null;
         String[] memberList= null;
+        String[] emptyList = {""};
         try{
             line= "SHOW-PROJECT-MEMBERS#" +projectName;
 
@@ -260,8 +262,10 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             System.out.println("[CLIENT] Show member of project - parameters: "+projectName);
             System.out.println("[CLIENT] Server Response : "+response+ "\n");
 
-            String delims = "[#]+";
-            memberList = response.split(delims);
+            if(response.compareTo("ERROR") != 0) {
+                String delims = "[#]+";
+                memberList = response.split(delims);
+            }
 
 
         }
@@ -275,7 +279,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             System.exit(1);
         }
 
-        if(response.compareTo("ERROR") == 0) return null;
+        if(response.compareTo("ERROR") == 0) return emptyList;
         else return memberList;
     }
 
@@ -307,30 +311,24 @@ public class Client extends RemoteObject implements UserUpdateNotify {
                 if(response.compareTo("ERROR") == 0) status = 1;
                 else if(response.compareTo("OK") == 0 && username.compareTo("") != 0) {
 
-
-                    String projectMulticastIP;
-
                     if (projectWithoutMulticast != null && projectWithMulticast != null) {
-                        for (String projectName : projectWithoutMulticast) {
 
-                            MulticastSocket receiver = null;
+                        for (String multicastIP : multicastRegister.keySet()) {
+                            MulticastSocket groupSocket = multicastRegister.get(multicastIP);
+                            groupSocket.leaveGroup(InetAddress.getByName(multicastIP));
+                            groupSocket.close();
+                            System.out.println("[CLIENT] Leaving multicast group " + multicastIP);
+                        }
 
-                            int projectIndex = 1;
-                            for (int i = 0; i < projectWithMulticast.length; i += 2) {
-                                if (projectWithMulticast[i].compareTo(projectName) == 0) projectIndex = i + 1;
+                        for (ChatReceiverThread threadListener : chatListener.values()) {
+                            try {
+                                threadListener.join(100);
+
+                            }catch (InterruptedException e){
+                                threadListener.interrupt();
                             }
-
-                            ChatReceiverThread chatThread = null;
-                            JTextArea messageListBoxArea = new JTextArea(1, 1); //Fake text area for history update
-                            if (this.isListenerRegistered(projectName)) {
-
-                                chatThread = this.getListenerThread(projectName);
-                                if (chatThread.isAlive()) chatThread.interrupt();
-                            }
-
                         }
                     }
-
                 }
 
             serverNotifier.unregisterForCallback(stubNotifier,username);
@@ -355,6 +353,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
     public Integer addCard(String projectName, String cardName, String descrizione){
 
         String response=null;
+        int status = 2;
         try{
             line= "ADD-CARD-REQUEST#" +projectName + "#" + cardName +  "#"+descrizione;
 
@@ -377,14 +376,11 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             System.exit(1);
         }
 
-        if(response.compareTo("CARD-DUPLICATE-ERROR") == 0) return 1;
-        else if (response.compareTo("PROJECT-ELIMINATED") == 0) return 2;
-        else if(response.compareTo("OK") == 0){
+        if(response.compareTo("CARD-DUPLICATE-ERROR") == 0) status = 1;
+        else if (response.compareTo("PROJECT-ELIMINATED") == 0) status = 2;
+        else if(response.compareTo("OK") == 0) status = 0;
 
-            return 0;
-
-        }
-        return 1;
+        return status;
 
 
     }
@@ -403,6 +399,7 @@ public class Client extends RemoteObject implements UserUpdateNotify {
 
         if(response.compareTo("CARD-STATUS-ERROR") == 0) status = 1;
         else if(response.compareTo("OK") == 0) status = 0;
+        else status = 2;
 
         }catch(IOException e) {
             JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO6", JOptionPane.ERROR_MESSAGE);
@@ -481,27 +478,29 @@ public class Client extends RemoteObject implements UserUpdateNotify {
             System.out.println("[CLIENT "+ username + "] List project - parameters: "+username);
             System.out.println("[CLIENT] Server Response : "+response +  "\n");
 
-            if(multicastGroup && response.compareTo("") != 0){
+            if(response.compareTo("") != 0) {
+                if (multicastGroup) {
 
-                String delims = "[#]+";
-                projectListWithIP = response.split(delims);
+                    String delims = "[#]+";
+                    projectListWithIP = response.split(delims);
 
 
-            } else if(response.compareTo("") != 0){
+                } else {
 
-                String delims = "[#]+";
-                projectListWithIP = response.split(delims);
-                projectListWithoutIP = new String[(projectListWithIP.length/2)];
+                    String delims = "[#]+";
+                    projectListWithIP = response.split(delims);
+                    projectListWithoutIP = new String[(projectListWithIP.length / 2)];
 
-                for (int i = 0; i < projectListWithIP.length/2; i++) {
-                    projectListWithoutIP[i] = projectListWithIP[i*2];
+                    for (int i = 0; i < projectListWithIP.length / 2; i++) {
+                        projectListWithoutIP[i] = projectListWithIP[i * 2];
+                    }
                 }
             }
 
 
         }
         catch(IOException | NullPointerException e){
-            e.printStackTrace();
+            //e.printStackTrace();
             JOptionPane.showMessageDialog(null, "Impossibile connettersi al server", "ERRORE INTERNO", JOptionPane.ERROR_MESSAGE);
             try {
                 serverSocket.close();

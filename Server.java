@@ -136,7 +136,7 @@ public class Server extends RemoteServer implements WorthRegisterServiceInterfac
         }
 
     }
-    public Integer register(String username, String password) throws RemoteException {
+    public synchronized Integer register(String username, String password) throws RemoteException {
 
         /*#### ERROR CODEX
         * error = 0 --> OK
@@ -150,7 +150,6 @@ public class Server extends RemoteServer implements WorthRegisterServiceInterfac
         else {
             dataContainer.register(username,password);
             serverUpdate.update(username, "offline");
-
 
         }
 

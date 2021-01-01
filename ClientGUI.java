@@ -379,7 +379,11 @@ public class ClientGUI extends JPanel {
                                     String newMember = memberListComboBox.getSelectedItem().toString();
                                     Integer response = clientProcessor.addMember(selectedProject, newMember);
 
-                                    if(response == 2) JOptionPane.showMessageDialog(null, "Membro giá parte del progetto", "Errore", JOptionPane.ERROR_MESSAGE);
+                                    if(response == 1) JOptionPane.showMessageDialog(null, "Membro giá parte del progetto", "Errore", JOptionPane.ERROR_MESSAGE);
+                                    else if(response == 2){
+                                        JOptionPane.showMessageDialog(null, "Progetto eliminato da un altro utente", "Errore", JOptionPane.ERROR_MESSAGE);
+                                        showChatProjectDialog.setVisible(false);
+                                    }
                                     else if(response == 0)  {
                                         InetAddress group = null;
                                         try {
@@ -495,7 +499,7 @@ public class ClientGUI extends JPanel {
                     @Override
                     public void actionPerformed(ActionEvent actionEvent) {
                         projectTitleField.getText();
-                        if(projectTitleField.getText().isEmpty() || projectTitleField.getText().isBlank())
+                        if(projectTitleField.getText().isEmpty() || projectTitleField.getText().isBlank() || projectTitleField.getText().contains("#"))
                             JOptionPane.showMessageDialog(null, "Titolo progetto vuoto!", "Errore", JOptionPane.ERROR_MESSAGE);
                         else {
                             int serverResponse = clientProcessor.createProject(projectTitleField.getText());
@@ -609,7 +613,7 @@ public class ClientGUI extends JPanel {
 
                             JPanel card5 = new JPanel();
 
-                            ClientMenuGUI showCardPanel = new ClientMenuGUI(clientProcessor, selectedProject).ClientShowCardsGUI(mainWindow);
+                            ClientMenuGUI showCardPanel = new ClientMenuGUI(clientProcessor, selectedProject).ClientShowCardsGUI(mainWindow,frame);
                             card1.add(new ClientMenuGUI(clientProcessor, selectedProject).ClientRemoveCardGUI(frame));
                             card2.add(new ClientMenuGUI(clientProcessor, selectedProject).ClientAddCardGUI(card3,card4,card5, mainWindow,dashWindow, frame));
                             card3.add(showCardPanel);
@@ -732,9 +736,9 @@ public class ClientGUI extends JPanel {
                 String registerUsername = usernameRegisterField.getText();
                 String registerPassword = new String(passwordRegisterField.getPassword());
 
-                if (registerUsername.isEmpty())
+                if (registerUsername.isEmpty() || registerUsername.isBlank() || registerUsername.contains("#"))
                     JOptionPane.showMessageDialog(null, "Errore: campo username vuoto", "Errore", JOptionPane.ERROR_MESSAGE);
-                else if (registerPassword.isEmpty())
+                else if (registerPassword.isEmpty() || registerPassword.isBlank() ||  registerPassword.contains("#"))
                     JOptionPane.showMessageDialog(null, "Errore: campo password vuoto", "Errore", JOptionPane.ERROR_MESSAGE);
                 else {
 
@@ -858,9 +862,9 @@ public class ClientGUI extends JPanel {
                 username = username_field.getText();
                 password = new String(password_field.getPassword());
 
-                if (username.isEmpty())
+                if (username.isEmpty() || username.contains("#"))
                     JOptionPane.showMessageDialog(null, "Errore: campo username vuoto", "Errore", JOptionPane.ERROR_MESSAGE);
-                else if (password.isEmpty())
+                else if (password.isEmpty() || password.contains("#"))
                     JOptionPane.showMessageDialog(null, "Errore: campo password vuoto", "Errore", JOptionPane.ERROR_MESSAGE);
                 else {
                     try {
