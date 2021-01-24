@@ -1,0 +1,3 @@
+grant codeBase "file:/home/luca/IdeaProjects/P1/src/main/java/" {
+    permission java.security.AllPermission;
+};
